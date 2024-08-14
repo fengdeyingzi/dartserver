@@ -13,6 +13,10 @@ ServerController controller = new ServerController();
 server.GET("/api/testApi",  controller.TestApi);
 //Example POST interface
 server.POST("/api/postTest",  controller.PostTest);
+//Define a route for a static file
+server.StaticFile("/.gitignore", ".gitignore");
+//Define a folder route
+server.Static("/test", "./test");
 Print (Start Starting Service) http://127.0.0.1:8081 ");
 //Start service
 server.Run(8081);

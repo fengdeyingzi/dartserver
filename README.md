@@ -13,6 +13,10 @@ example/dartserver_example.dart
   server.GET("/api/testApi", controller.TestApi);
   //示例POST接口
   server.POST("/api/postTest", controller.PostTest);
+  //定义一个静态文件的路由
+  server.StaticFile("/.gitignore", ".gitignore");
+  //定义一个文件夹路由
+  server.Static("/test", "./test");
   print("开始启动服务 http://127.0.0.1:8081");
   //启动服务
   server.Run(8081);

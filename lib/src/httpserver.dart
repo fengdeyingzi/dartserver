@@ -16,6 +16,7 @@ class HTTPServer {
   Map<String, RequestHandler> map_head = new Map();
   Map<String, RequestHandler> map_patch = new Map();
   Map<String, String> map_static = new Map();
+  Map<String, String> map_staticfile = new Map();
   HttpServer? httpServer;
   RequestHandler? _noRoute;
   HandleRouter? _router;
@@ -38,6 +39,7 @@ class HTTPServer {
     String url = getUrl(request.uri.toString());
     if (map_get[url] != null) {
       await map_get[url]?.call(request);
+    } else if (await handleStaticFile(request)) {
     } else if (await handleStatic(request)) {
     } else {
       print("未知的路由：" + url);
@@ -53,22 +55,48 @@ class HTTPServer {
       if (url.startsWith(key)) {
         Directory dir = Directory(value!);
         File file = File(dir.path + url.substring(key.length));
-        if(!file.existsSync()){
+        if (!file.existsSync()) {
           return false;
         }
         // print("读取文件 "+file.path);
-        request.response.headers.contentType = ContentType("application", "octet-stream");
+        request.response.headers.contentType =
+            ContentType("application", "octet-stream");
 
-         // 使用File.openRead逐块读取文件
-          var bytes = await file.readAsBytes();
-          // print("文件长度："+bytes.length.toString());
-          
-          await request.response.addStream(file.openRead());
-        
+        // 使用File.openRead逐块读取文件
+        // var bytes = await file.readAsBytes();
+        // print("文件长度："+bytes.length.toString());
+
+        await request.response.addStream(file.openRead());
+
         return true;
       }
-     }
-    
+    }
+
+    return false;
+  }
+
+  Future<bool> handleStaticFile(HttpRequest request) async {
+    String url = getUrl(request.uri.toString());
+    var listKey = map_staticfile.keys.toList();
+    for (var key in listKey) {
+      var value = map_staticfile[key];
+      if (url == key) {
+        File file = File(value!);
+        if (!file.existsSync()) {
+          return false;
+        }
+        request.response.headers.contentType =
+            ContentType("application", "octet-stream");
+
+        // 使用File.openRead逐块读取文件
+        // var bytes = await file.readAsBytes();
+        // print("文件长度："+bytes.length.toString());
+
+        await request.response.addStream(file.openRead());
+
+        return true;
+      }
+    }
     return false;
   }
 
@@ -146,6 +174,10 @@ class HTTPServer {
     map_static[localUrl] = path;
   }
 
+  void StaticFile(String localUrl, String filename) {
+    map_staticfile[localUrl] = filename;
+  }
+
   Future<void> handleNoRoute(HttpRequest request) async {
     request.response
       //获取和设置内容类型（报头）
@@ -167,31 +199,31 @@ class HTTPServer {
 
   void _handleRequest(HttpRequest request) async {
     if (_router == null) {
-          _router = handleRouter;
-        }
-        if (_noRoute == null) {
-          _noRoute = handleNoRoute;
-        }
+      _router = handleRouter;
+    }
+    if (_noRoute == null) {
+      _noRoute = handleNoRoute;
+    }
 
-        if (_router!.call(request)) {
-          if (request.method == "POST") {
-            handlePost(request);
-          } else if (request.method == "GET") {
-            await handleGet(request);
-          } else if (request.method == "DELETE") {
-            handleDelete(request);
-          } else if (request.method == "PUT") {
-            handlePut(request);
-          } else if (request.method == "OPTIONS") {
-            handleOptions(request);
-          } else if (request.method == "HEAD") {
-            handleHead(request);
-          } else if (request.method == "PATCH") {
-            handlePatch(request);
-          }
-        }
-        //结束与客户端连接
-        request.response.close();
+    if (_router!.call(request)) {
+      if (request.method == "POST") {
+        handlePost(request);
+      } else if (request.method == "GET") {
+        await handleGet(request);
+      } else if (request.method == "DELETE") {
+        handleDelete(request);
+      } else if (request.method == "PUT") {
+        handlePut(request);
+      } else if (request.method == "OPTIONS") {
+        handleOptions(request);
+      } else if (request.method == "HEAD") {
+        handleHead(request);
+      } else if (request.method == "PATCH") {
+        handlePatch(request);
+      }
+    }
+    //结束与客户端连接
+    request.response.close();
   }
 
   void Run(int port) {
