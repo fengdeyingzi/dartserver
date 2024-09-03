@@ -3,6 +3,7 @@ library simple_http_server;
 
 import 'dart:convert';
 import 'dart:io';
+// import 'dart:mirrors' if (dart.librarys.flu) 'web.dart';
 
 typedef RequestHandler = Future<void> Function(HttpRequest request);
 typedef HandleRouter = bool Function(HttpRequest request);
@@ -17,33 +18,97 @@ class HTTPServer {
   Map<String, RequestHandler> map_patch = new Map();
   Map<String, String> map_static = new Map();
   Map<String, String> map_staticfile = new Map();
+  Map<String, String> map_api = new Map();
+  Map<String, String> map_type = new Map();
   HttpServer? httpServer;
   RequestHandler? _noRoute;
   HandleRouter? _router;
 
+  String _getStringInsideQuotes(String input) {
+    int startIndex = input.indexOf('\''); // 查找第一个引号的索引
+    if (startIndex == -1) return ''; // 如果没有找到，引号内的字符串为空
+
+    int endIndex = input.indexOf('\'', startIndex + 1); // 查找第二个引号
+    if (endIndex == -1) return ''; // 如果没有找到第二个引号，引号内的字符串为空
+
+    return input.substring(startIndex + 1, endIndex); // 返回引号内的字符串
+  }
+
+  String _getFunctionName(dynamic request) {
+    // #ifdef SWAGGER
+/*    InstanceMirror mirr = reflect(request);
+    return _getStringInsideQuotes(mirr.reflectee.toString());*/
+    // #else
+    return '';
+    // #endif
+
+  }
+
   Future<void> handlePost(HttpRequest request) async {
     // var myStringStorage = await utf8.decoder.bind(request).join();
     // print(request.contentLength);
-    String url = getUrl(request.uri.toString());
-    if (map_post[url] != null) {
-      await map_post[url]!.call(request);
-    } else {
-      print("未知的路由：" + url);
-      _noRoute?.call(request);
+    try {
+      String url = getUrl(request.uri.toString());
+      if (map_post[url] != null) {
+        await map_post[url]!.call(request);
+      } else {
+        print("未知的路由：" + url);
+        _noRoute?.call(request);
+      }
+    } catch (e, trace) {
+      print(e.toString());
+      print(trace.toString());
     }
   }
 
   Future<void> handleGet(HttpRequest request) async {
     // var myStringStorage = await utf8.decoder.bind(request).join();
     // print(request.contentLength);
-    String url = getUrl(request.uri.toString());
-    if (map_get[url] != null) {
-      await map_get[url]?.call(request);
-    } else if (await handleStaticFile(request)) {
-    } else if (await handleStatic(request)) {
-    } else {
-      print("未知的路由：" + url);
-      _noRoute?.call(request);
+    try {
+      String url = getUrl(request.uri.toString());
+      if (map_get[url] != null) {
+        await map_get[url]?.call(request);
+      } else if (await handleStaticFile(request)) {
+      } else if (await handleStatic(request)) {
+      } else {
+        print("未知的路由：" + url);
+        _noRoute?.call(request);
+      }
+    } catch (e, trace) {
+      print(e.toString());
+      print(trace.toString());
+    }
+  }
+
+  String _getContentType(String fileName) {
+    // 获取文件扩展名
+    final extension = fileName.split('.').last.toLowerCase();
+
+    // 根据扩展名返回相应的 Content-Type
+    switch (extension) {
+      case 'html':
+        return 'text/html';
+      case 'css':
+        return 'text/css';
+      case 'js':
+        return 'application/javascript';
+      case 'json':
+        return 'application/json';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'gif':
+        return 'image/gif';
+      case 'txt':
+        return 'text/plain';
+      case 'pdf':
+        return 'application/pdf';
+      case 'xml':
+        return 'application/xml';
+      default:
+        return 'application/octet-stream'; // 默认类型
     }
   }
 
@@ -60,7 +125,7 @@ class HTTPServer {
         }
         // print("读取文件 "+file.path);
         request.response.headers.contentType =
-            ContentType("application", "octet-stream");
+            ContentType.parse(_getContentType(file.path));
 
         // 使用File.openRead逐块读取文件
         // var bytes = await file.readAsBytes();
@@ -86,7 +151,7 @@ class HTTPServer {
           return false;
         }
         request.response.headers.contentType =
-            ContentType("application", "octet-stream");
+            ContentType.parse(_getContentType(file.path));
 
         // 使用File.openRead逐块读取文件
         // var bytes = await file.readAsBytes();
@@ -159,10 +224,14 @@ class HTTPServer {
   }
 
   void POST(String localUrl, RequestHandler handler) {
+    map_api[localUrl] = _getFunctionName(handler);
+    map_type[localUrl] = "POST";
     map_post[localUrl] = handler;
   }
 
   void GET(String localUrl, RequestHandler handler) {
+    map_api[localUrl] = _getFunctionName(handler);
+    map_type[localUrl] = "GET";
     map_get[localUrl] = handler;
   }
 
@@ -207,19 +276,19 @@ class HTTPServer {
 
     if (_router!.call(request)) {
       if (request.method == "POST") {
-        handlePost(request);
+        await handlePost(request);
       } else if (request.method == "GET") {
         await handleGet(request);
       } else if (request.method == "DELETE") {
-        handleDelete(request);
+        await handleDelete(request);
       } else if (request.method == "PUT") {
-        handlePut(request);
+        await handlePut(request);
       } else if (request.method == "OPTIONS") {
-        handleOptions(request);
+        await handleOptions(request);
       } else if (request.method == "HEAD") {
-        handleHead(request);
+        await handleHead(request);
       } else if (request.method == "PATCH") {
-        handlePatch(request);
+        await handlePatch(request);
       }
     }
     //结束与客户端连接
