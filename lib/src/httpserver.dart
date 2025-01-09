@@ -52,8 +52,8 @@ class HTTPServer {
       if (map_post[url] != null) {
         await map_post[url]!.call(request);
       } else {
-        print("未知的路由：" + url);
-        _noRoute?.call(request);
+        print("未知的路由：${request.method}" + url);
+        await _noRoute?.call(request);
       }
     } catch (e, trace) {
       print(e.toString());
@@ -71,8 +71,8 @@ class HTTPServer {
       } else if (await handleStaticFile(request)) {
       } else if (await handleStatic(request)) {
       } else {
-        print("未知的路由：" + url);
-        _noRoute?.call(request);
+        print("未知的路由：${request.method}" + url);
+        await _noRoute?.call(request);
       }
     } catch (e, trace) {
       print(e.toString());
@@ -121,7 +121,9 @@ class HTTPServer {
         Directory dir = Directory(value!);
         File file = File(dir.path + url.substring(key.length));
         if (!file.existsSync()) {
-          return false;
+          file = File(dir.path + Uri.decodeComponent(url.substring(key.length)));
+          if(!file.existsSync())
+            return false;
         }
         // print("读取文件 "+file.path);
         request.response.headers.contentType =
@@ -172,8 +174,8 @@ class HTTPServer {
     if (map_delete[url] != null) {
       await map_delete[url]?.call(request);
     } else {
-      print("未知的路由：" + url);
-      _noRoute?.call(request);
+      print("未知的路由：${request.method}" + url);
+      await _noRoute?.call(request);
     }
   }
 
@@ -184,8 +186,8 @@ class HTTPServer {
     if (map_put[url] != null) {
       await map_put[url]?.call(request);
     } else {
-      print("未知的路由：" + url);
-      _noRoute?.call(request);
+      print("未知的路由：${request.method}" + url);
+      await _noRoute?.call(request);
     }
   }
 
@@ -196,8 +198,8 @@ class HTTPServer {
     if (map_options[url] != null) {
       await map_options[url]?.call(request);
     } else {
-      print("未知的路由：" + url);
-      _noRoute?.call(request);
+      print("未知的路由：${request.method}" + url);
+      await _noRoute?.call(request);
     }
   }
 
@@ -206,8 +208,8 @@ class HTTPServer {
     if (map_head[url] != null) {
       await map_head[url]?.call(request);
     } else {
-      print("未知的路由：" + url);
-      _noRoute?.call(request);
+      print("未知的路由：${request.method}" + url);
+      await _noRoute?.call(request);
     }
   }
 
@@ -218,8 +220,8 @@ class HTTPServer {
     if (map_patch[url] != null) {
       await map_patch[url]?.call(request);
     } else {
-      print("未知的路由：" + url);
-      _noRoute?.call(request);
+      print("未知的路由：${request.method}" + url);
+      await _noRoute?.call(request);
     }
   }
 
@@ -295,18 +297,37 @@ class HTTPServer {
     request.response.close();
   }
 
-  void Run(int port) {
-    HttpServer.bind(InternetAddress.anyIPv4, port).then((server) {
-      httpServer = server;
+  Future<void> Run(int port) async{
+    HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    httpServer = server;
       server.listen((request) {
         _handleRequest(request);
       });
-    });
   }
 
-  void Stop() {
+  Future<void> RunSSL(int port, String cert, String key) async{
+     // 创建一个 SecurityContext 对象
+  var context = SecurityContext();
+
+  // 加载证书和私钥文件
+  context.useCertificateChain(cert); // 'cert.pem'
+  context.usePrivateKey(key); // 'key.pem'
+
+  // 创建一个 HTTPS 服务器
+  var server = await HttpServer.bindSecure(
+    InternetAddress.anyIPv4,
+    port, // HTTPS 默认端口
+    context,
+  );
+    httpServer = server;
+      server.listen((request) {
+        _handleRequest(request);
+      });
+  }
+
+  Future<void> Stop() async {
     if (httpServer != null) {
-      httpServer!.close();
+      await httpServer!.close();
       httpServer = null;
     }
   }
